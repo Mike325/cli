@@ -28,8 +28,8 @@ from dataclasses import dataclass, field
 
 from .logger import get_logger
 
-_warn_regex = re.compile(r"(warn(ing)?\s*:?|\[warn(ing)?\])", re.IGNORECASE)
-_error_regex = re.compile(r"((err(or)?|fail(ed)?)\s*:?|\[(err(or)?|fail(ed)?)\])", re.IGNORECASE)
+_warn_regex = re.compile(r"(<warn(ing)?>\s*:?|\[warn(ing)?\])", re.IGNORECASE)
+_error_regex = re.compile(r"(<(err(or)?|fail(ed)?)>\s*:?|\[(err(or)?|fail(ed)?)\])", re.IGNORECASE)
 
 _log: logging.Logger
 # _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
