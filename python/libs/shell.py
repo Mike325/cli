@@ -183,7 +183,11 @@ class Job(object):
         stderr.daemon = True
         stderr.start()
 
-        process.wait(timeout)
+        try:
+            process.wait(timeout if timeout else 60)
+        except subprocess.TimeoutExpired:
+            cmd_str = " ".join(cmd)
+            _log.error(f'command "{cmd_str}" timeout')
 
         self.rc = process.returncode
 
