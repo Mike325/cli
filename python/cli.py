@@ -31,13 +31,16 @@ import argparse
 import logging
 import os
 
+# from typing import Dict
+from typing import Optional
+
+from libs.constants import AUTHOR, HEADER, VERSION
+from libs.logger import create_logger, str_to_logging
+
 # import subprocess
 # import sys
 # import re
 # import shutil
-
-# from typing import Dict
-from typing import Optional
 
 # from typing import List
 # from typing import Sequence
@@ -46,13 +49,6 @@ from typing import Optional
 # from typing import Union
 # from typing import cast
 # from dataclasses import dataclass, field
-
-from libs.logger import create_logger
-from libs.logger import str_to_logging
-
-from libs.constants import HEADER
-from libs.constants import AUTHOR
-from libs.constants import VERSION
 
 _log: logging.Logger
 # _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

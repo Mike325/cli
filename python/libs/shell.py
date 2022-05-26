@@ -4,27 +4,19 @@
 # import argparse
 import logging
 
-# import os
-import subprocess
-
 # import sys
 import re
 import shutil
 
-# from typing import Dict
-from typing import Optional
-from typing import List
-from typing import Sequence
-from typing import IO
+# import os
+import subprocess
+from dataclasses import dataclass, field
 
 # from typing import Any
 # from typing import Union
-from typing import cast
-
-from dataclasses import dataclass, field
-
-# from pathlib import Path
-# from zipfile import ZipFile
+# from typing import Dict
+from typing import IO, List, Optional, Sequence
+from threading import Thread
 
 from .logger import get_logger
 
@@ -91,6 +83,7 @@ class Job(object):
         background: bool = True,
         cwd: Optional[str] = None,
         remote_host: Optional[str] = None,
+        timeout: Optional[int] = None,
         # sshkey: Optional[str] = None,
     ) -> int:
         """Execute the cmd
@@ -129,53 +122,68 @@ class Job(object):
         self.stdout = []
         self.stderr = []
 
+        def stdout_reader(f: Optional[IO], stdout: List[str], stderr: List[str]):
+            while f is not None:
+                line = f.readline().replace("\n", "")
+                if line.strip():
+                    # TODO: to clarify info/warning/error messages may add another step to replace
+                    #       the regex match with the process name
+                    if _error_regex.search(line):
+                        if not line.find("\r"):
+                            stderr.append(line)
+                        else:
+                            stderr += line.split("\r")
+
+                        _log.error(line)
+                    else:
+                        if _warn_regex.search(line):
+                            _log.warning(line)
+                        elif background:
+                            _log.debug(line)
+                        else:
+                            _log.info(line)
+
+                        if not line.find("\r"):
+                            stdout.append(line)
+                        else:
+                            stdout += line.split("\r")
+                elif not line:
+                    break
+
+        def stderr_reader(f: Optional[IO], stderr: List[str]):
+            while f is not None:
+                line = f.readline().replace("\n", "")
+                if line.strip():
+                    if not line.find("\r"):
+                        stderr.append(line)
+                    else:
+                        stderr += line.split("\r")
+                    _log.error(line)
+                elif not line:
+                    break
+
+        # NOTE: Should we add a retry option ?
         process = subprocess.Popen(
             cmd,
             # shell=True,
-            # text=True,
+            text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             # stdin=subprocess.PIPE,
             cwd=cwd if remote_host is None else ".",
             # bufsize=0,
         )
-
         self.pid = process.pid
 
-        # TODO: Add timeout kill
-        while process.poll() is None:
-            stdout = cast(IO[bytes], process.stdout).readline().decode().replace("\n", "")
-            stderr = cast(IO[bytes], process.stderr).readline().decode().replace("\n", "")
+        stdout = Thread(target=stdout_reader, args=(process.stdout, self.stdout, self.stderr))
+        stdout.daemon = True
+        stdout.start()
 
-            if stdout.strip():
-                # TODO: to clarify info/warning/error messages may add another step to replace
-                #       the regex match with the process name
-                if _error_regex.search(stdout):
-                    if not stdout.find("\r"):
-                        self.stderr.append(stdout)
-                    else:
-                        self.stderr += stdout.split("\r")
+        stderr = Thread(target=stderr_reader, args=(process.stderr, self.stderr))
+        stderr.daemon = True
+        stderr.start()
 
-                    _log.error(stdout)
-                else:
-                    if _warn_regex.search(stdout):
-                        _log.warning(stdout)
-                    elif background:
-                        _log.debug(stdout)
-                    else:
-                        _log.info(stdout)
-
-                    if not stdout.find("\r"):
-                        self.stdout.append(stdout)
-                    else:
-                        self.stdout += stdout.split("\r")
-
-            if stderr.strip():
-                if not stderr.find("\r"):
-                    self.stderr.append(stderr)
-                else:
-                    self.stderr += stderr.split("\r")
-                _log.error(stderr)
+        process.wait(timeout)
 
         self.rc = process.returncode
 
